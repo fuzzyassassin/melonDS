@@ -11,7 +11,14 @@ EMPTY = "(empty error message)"
 
 
 class LuaErrorText(ConsoleTest):
-    CASES = (("error('', 0)", EMPTY), ("error({})", NOT_A_STRING), ("error(nil)", NOT_A_STRING))
+    def setUp(self):
+        super().setUp()
+        # error(nil): Lua 5.4 raises nil (the placeholder); Lua 5.5 raises the string "<no error object>" itself
+        # (lua_error replaces a nil error object), so ErrorText gets a string. Expect whatever this Lua raises.
+        self.c.lua_output()
+        raised = self.c.lua_exec("print(select(2, pcall(error, nil)))").strip()
+        self.CASES = (("error('', 0)", EMPTY), ("error({})", NOT_A_STRING),
+                      ("error(nil)", NOT_A_STRING if raised == "nil" else raised))
 
     def test_exec_reports_placeholder_text(self):
         for code, text in self.CASES:
