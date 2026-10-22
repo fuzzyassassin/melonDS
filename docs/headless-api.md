@@ -464,7 +464,7 @@ typedef struct {
 | --- | --- | --- | --- | --- |
 | exec | the breakpoint address (instruction not executed yet) | = pc | 0 | before the instruction |
 | read / write | the instruction that made the access | the accessed address (start of the access) | write: the value written; read: memory at `addr` read through the debug path | before the **next** instruction of that CPU (the access has completed) |
-| write by DMA (`dma >= 0`) | the DMA tag `0xFFFFFFF0 \| channel << 1 \| arm7` (no instruction made the write) | the unit's destination | the unit written | **at once**, inside the DMA: the unit is written, the next one is not (the CPUs are between two instructions) |
+| write by DMA (`dma >= 0`) | the DMA tag `0xFFFFFFF0 \| channel << 1 \| arm7` (no instruction made the write) | the unit's destination | the unit written | **at once**, inside the DMA: the unit is written, the next one is not (the CPUs are between two instructions); only the transfer's first watched unit parks |
 | step | the next instruction | = pc | 0 | before that instruction |
 | request | the next instruction; for a request served at a frame boundary (waiting for input or at a barrier) `cpu` is 9 and `pc` the ARM9's next instruction (level 6; it was the raw ARM9 R15, one pipeline stage ahead) | = pc | 0 | before that instruction |
 | fault | the faulting instruction (ARM9 MPU prefetch or data abort) | the data address, or pc | 0 | before the abort is taken |
@@ -473,8 +473,13 @@ typedef struct {
 For a DMA break `cpu` is the CPU whose DMA controller made the write (9 for channels of the ARM9's
 DMA, 7 for the ARM7's), `dma` the channel 0-3 and `size` the unit size (2 or 4). The tag is the
 same encoding as the last-writer records, so `pc >= 0xFFFFFFF0` always means "a DMA, not an
-instruction". Resuming finishes the DMA (each further watched unit breaks again) and then the CPU
-continues. **What pc means at a DMA break:** the event's `pc` is the DMA tag, never an
+instruction". **One break per transfer:** the first watched unit of a DMA transfer parks; resuming
+finishes the transfer without parking again (its later watched units still count a hit and run Lua
+write hooks, whose return value then cannot park), and then the CPU continues. The channel's next
+transfer can break again (test `DmaWatchpoint.test_one_break_per_transfer` in `test_api_fixes.py`,
+`OneBreakPerDmaTransfer` in `test_pr_review.py`). A DMA across a watched 0x100-byte range parks once,
+not 64 times. A watch hit and its park are ordered around the write: the hook sees memory before the
+unit is written, the park comes after it. **What pc means at a DMA break:** the event's `pc` is the DMA tag, never an
 instruction; `mds_get_regs` index 15 is, for both CPUs, the instruction each runs next (both are
 between two instructions while the DMA runs). For an immediate DMA that is the instruction after the
 store that started it. The program that started the DMA is not recorded. (API level 1 queued DMA
@@ -951,7 +956,7 @@ typedef struct {
   (including TCM) and, for writes, **DMA**: an ARM9 DMA channel write checks the ARM9 watchpoints
   (`cpumask` bit 0), an ARM7 DMA write the ARM7 ones. DMA source reads and other bus masters are not
   watched. A CPU access breaks before the next instruction of that CPU; a DMA write breaks at once,
-  between two units, with `pc` = the DMA tag (see the break table in
+  between two units, with `pc` = the DMA tag, once per DMA transfer (see the break table in
   [section 2](#breaks-what-happens-and-mds_take_break)). Debugger reads and writes
   (`mds_read`/`mds_write`) do not trigger watchpoints.
 - Ids come from one per-console counter starting at 1, shared by breakpoints, watchpoints and Lua
@@ -2202,7 +2207,8 @@ renumbered each time.
    time therefore never synchronises them (intended per the tests, but surprising).
 8. **`mds_stop_after(id, 0)` and `(id, 1)` are the same** while a frame is in progress, and so are
    `mds_start(id, 0)` and `(id, 1)` on a parked console *(verified for start 0)*.
-9. **A DMA break parks inside the DMA**: between two units, with the CPUs between instructions.
+9. **A DMA break parks inside the DMA**: between two units, with the CPUs between instructions,
+   once per transfer.
    Commands work as at any park, but the console is not at a frame boundary (no savestates), and
    the program that started the DMA is not recorded (the event's `pc` is the DMA tag; `mds_get_regs`
    gives each CPU's next instruction).
@@ -2334,7 +2340,8 @@ These were items of the level-1 list (old numbers in brackets):
 - **Negative `max` crashed or misbehaved** [7]: every take/list call and `mds_run`/`mds_wait`'s
   count refuse it.
 - **DMA watchpoint breaks reported the CPU's last instruction as `pc` and fired when that CPU next
-  executed** [20]: they park at once with `pc` = the DMA tag and the channel in `dma`.
+  executed** [20]: they park at once with `pc` = the DMA tag and the channel in `dma`, once per DMA
+  transfer (as the queued hit was; for a while each watched unit parked).
 - **`mds_load_rom` accepted a parked console** [12]: it needs an idle one.
 - **`mds_lua_run`/`exec`/`stop` ran on the calling thread, and a first-step runtime error returned
   0** [11]: they run on the emulator thread through the command queue, and the error fails the call.

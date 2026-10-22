@@ -235,6 +235,9 @@ public:
         if (DMABreakValid[cpu])
             RaiseDMABreak(cpu);
     }
+    // A DMA channel starts a new transfer or finishes one. One transfer breaks at most once: the first watched
+    // unit that asks for a break parks, later units of the same transfer only run callbacks and count hits.
+    void OnDMATransfer(u8 cpu, u8 channel) { DMABroke[cpu & 1][channel & 3] = false; }
     void OnCall(ARM& cpu);
     void OnException(ARM& cpu, u32 ret);
     void OnFault(ARM& cpu, u32 pc, u32 addr);
@@ -271,6 +274,7 @@ private:
     std::array<BreakEvent, 2> Pending {};
     std::array<bool, 2> DMABreakValid {};   // a DMA watch hit to raise once its unit is written (OnDMAWritten)
     std::array<BreakEvent, 2> DMABreak {};
+    std::array<std::array<bool, 4>, 2> DMABroke {};  // the channel's current transfer has broken already
     void RaiseDMABreak(u8 n);
     bool InBreak = false;
     int InstrBreakCPU = -1;     // the CPU whose OnInstr is parked in Raise, else -1

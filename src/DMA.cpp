@@ -170,6 +170,8 @@ void DMA::Start()
         RemCount = Cnt & countmask;
         if (!RemCount)
             RemCount = countmask+1;
+
+        NDS.Debugger.OnDMATransfer(CPU, Num);   // a new transfer: its first watched unit may break
     }
 
     if (StartMode == 0x07 && RemCount > 112)
@@ -662,6 +664,7 @@ void DMA::Run9()
 
     Running = 0;
     InProgress = false;
+    NDS.Debugger.OnDMATransfer(0, Num);
     NDS.ResumeCPU(0, 1<<Num);
 
     if (StartMode == 0x05)
@@ -747,6 +750,7 @@ void DMA::Run7()
 
     Running = 0;
     InProgress = false;
+    NDS.Debugger.OnDMATransfer(1, Num);
     NDS.ResumeCPU(1, 1<<Num);
 
     if (StartMode == 0x12)

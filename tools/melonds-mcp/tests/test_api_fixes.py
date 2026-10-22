@@ -325,15 +325,20 @@ class DmaWatchpoint(ConsoleTest):
         self.run_frames(1)
         self.assertEqual(self.c.read(self.DST, 16), bytes(range(1, 17)))
 
-    def test_each_unit_breaks(self):
-        self.c.add_watchpoint(self.DST, 16, write=True)
-        self.load_program(dma_program(self.SRC, self.DST))
-        addrs = []
-        for _ in range(4):
+    def test_one_break_per_transfer(self):
+        # the first watched unit parks; the other units of that transfer only count hits. A new transfer of the
+        # channel breaks again.
+        wp = self.c.add_watchpoint(self.DST, 16, write=True)
+        for _ in range(2):
+            self.load_program(dma_program(self.SRC, self.DST))
             _, states = self.c.run(3)
             self.assertEqual(states, [native.PARKED])
-            addrs.append(self.c.take_break().addr)
-        self.assertEqual(addrs, [self.DST, self.DST + 4, self.DST + 8, self.DST + 12])
+            b = self.c.take_break()
+            self.assertEqual((b.addr, b.dma), (self.DST, 0))
+            self.run_frames(1)
+            self.assertEqual(self.c.read(self.DST, 16), bytes(range(1, 17)))
+        hits = next(p["hits"] for p in self.c.points() if p["id"] == wp)
+        self.assertEqual(hits, 8)
 
     def test_last_writer_names_the_channel(self):
         self.c.track_writers(True)

@@ -102,6 +102,7 @@ void Debugger::Reset()
         StepModes[i] = StepMode::None;
         PendingValid[i] = false;
         DMABreakValid[i] = false;
+        DMABroke[i] = {};
         CallStack[i].clear();
         ParkedStacks[i].clear();
         Exceptions[i].clear();
@@ -287,6 +288,7 @@ void Debugger::OnStateLoaded()
         JumpTarget[i] = 0;
         PendingValid[i] = false;
         DMABreakValid[i] = false;
+        DMABroke[i] = {};
         // rebuild the stacks from the loaded CPU state: the frames below the first call are unwound from
         // the stack again (see SeedBelow), and calls that return into a hook's memory.execute are forgotten
         SeedPending[i] = CallTracking;
@@ -1478,10 +1480,13 @@ void Debugger::WatchHit(u8 n, u32 addr, u8 size, u32 value, bool write, u8 dma)
             continue;
         if (dma != 0xFF)
         {
-            if (!DMABreakValid[n])
+            // one break per transfer (the channel's flag is cleared by OnDMATransfer); later units only
+            // run the callbacks and count hits, as upstream's queued DMA hit did
+            if (!DMABreakValid[n] && !DMABroke[n][dma & 3])
             {
                 DMABreak[n] = hit;
                 DMABreakValid[n] = true;
+                DMABroke[n][dma & 3] = true;
             }
         }
         else if (!PendingValid[n])
