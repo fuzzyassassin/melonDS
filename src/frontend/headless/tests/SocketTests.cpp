@@ -37,17 +37,35 @@ TEST(socket_port_zero_picks_nonzero_port)
 
 TEST(socket_next_port_when_taken)
 {
-    uint16_t base = 0;
-    Socket a = BindFirstFree(0, 1, base);
-    CHECK(a != InvalidSocket);
-    if (a == InvalidSocket)
-        return;
-    uint16_t second = 0;
-    Socket b = BindFirstFree(base, 8, second);
-    CHECK(b != InvalidSocket);
-    CHECK_EQ(second, base + 1);
-    CloseSocket(b);
-    CloseSocket(a);
+    // base comes from the OS, so base + 1 may not be bindable at all: another process holds it, or it is in a Windows
+    // excluded port range (Hyper-V reserves blocks of 100 inside the dynamic range). Probe base + 1 first and retry
+    // with a new base when it is unavailable; a BindFirstFree that does not move on fails every attempt.
+    bool tested = false;
+    for (int attempt = 0; attempt < 20 && !tested; attempt++)
+    {
+        uint16_t base = 0;
+        Socket a = BindFirstFree(0, 1, base);
+        CHECK(a != InvalidSocket);
+        if (a == InvalidSocket)
+            return;
+        uint16_t probed = 0;
+        Socket probe = base < 65535 ? BindFirstFree(base + 1, 1, probed) : InvalidSocket;
+        if (probe == InvalidSocket)
+        {
+            CloseSocket(a);
+            continue;
+        }
+        CloseSocket(probe);
+        uint16_t second = 0;
+        Socket b = BindFirstFree(base, 8, second);
+        CHECK(b != InvalidSocket);
+        CHECK_EQ(second, base + 1);
+        if (b != InvalidSocket)
+            CloseSocket(b);
+        CloseSocket(a);
+        tested = true;
+    }
+    CHECK(tested);
 }
 
 TEST(socket_strict_range_fails_when_taken)
