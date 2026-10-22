@@ -1,6 +1,5 @@
 build*/
 /debug*/
-!src/frontend/qt_sdl/debugger/
 bin
 obj
 *.depend

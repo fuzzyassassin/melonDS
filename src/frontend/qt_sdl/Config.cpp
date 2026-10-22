@@ -119,7 +119,8 @@ DefaultList<std::string> DefaultStrings =
 {
     {"DLDI.ImagePath",                  "dldi.bin"},
     {"DSi.SD.ImagePath",                "dsisd.bin"},
-    {"Instance*.Firmware.Username",     "melonDS"}
+    {"Instance*.Firmware.Username",     "melonDS"},
+    {"Instance*.Gdb.BindAddress",       "127.0.0.1"}
 };
 
 DefaultList<double> DefaultDoubles =
