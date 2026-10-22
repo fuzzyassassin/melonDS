@@ -101,6 +101,7 @@ void Debugger::Reset()
         StepRemaining[i] = 0;
         StepModes[i] = StepMode::None;
         PendingValid[i] = false;
+        DMABreakValid[i] = false;
         CallStack[i].clear();
         ParkedStacks[i].clear();
         Exceptions[i].clear();
@@ -285,6 +286,7 @@ void Debugger::OnStateLoaded()
         Prev2Instr[i] = 0;
         JumpTarget[i] = 0;
         PendingValid[i] = false;
+        DMABreakValid[i] = false;
         // rebuild the stacks from the loaded CPU state: the frames below the first call are unwound from
         // the stack again (see SeedBelow), and calls that return into a hook's memory.execute are forgotten
         SeedPending[i] = CallTracking;
@@ -1458,15 +1460,14 @@ void Debugger::WatchHit(u8 n, u32 addr, u8 size, u32 value, bool write, u8 dma)
 
     if (!write)
         value = Peek(n, addr, size);
-    bool raiseDMA = false;
-    BreakEvent dmaEvent {};
     for (int id : hits)
     {
         auto it = std::find_if(Watchpoints.begin(), Watchpoints.end(), [id](const Watchpoint& w) { return w.ID == id; });
         if (it == Watchpoints.end())
             continue;
-        // A DMA write is not made by an instruction: its pc is the DMA tag, and it parks at once (the DMA
-        // is between two units, the CPUs between two instructions) instead of at the CPU's next instruction.
+        // A DMA write is not made by an instruction: its pc is the DMA tag, and it parks as soon as the unit is
+        // written (OnDMAWritten: the DMA is between two units, the CPUs between two instructions) instead of at
+        // the CPU's next instruction.
         u32 pc = dma == 0xFF ? CurPC[n] : (DMAWriterTag | (dma << 1) | n);
         BreakEvent hit {write ? BreakKind::Write : BreakKind::Read, n, size, id, pc, addr, value, dma};
         BreakCallback cb = it->Callback;
@@ -1477,10 +1478,10 @@ void Debugger::WatchHit(u8 n, u32 addr, u8 size, u32 value, bool write, u8 dma)
             continue;
         if (dma != 0xFF)
         {
-            if (!raiseDMA)
+            if (!DMABreakValid[n])
             {
-                dmaEvent = hit;
-                raiseDMA = true;
+                DMABreak[n] = hit;
+                DMABreakValid[n] = true;
             }
         }
         else if (!PendingValid[n])
@@ -1490,13 +1491,15 @@ void Debugger::WatchHit(u8 n, u32 addr, u8 size, u32 value, bool write, u8 dma)
             Armed[n] = true;
         }
     }
-    if (raiseDMA)
-    {
-        // the service context: a write while parked here refetches a CPU pipeline it covers (SyncPipelines),
-        // but no CPU is in its instruction hook, so memory.execute stays refused
-        ContextGuard guard(*this, HookContext::Service, n);
-        Raise(dmaEvent);
-    }
+}
+
+void Debugger::RaiseDMABreak(u8 n)
+{
+    DMABreakValid[n] = false;
+    // the service context: a write while parked here refetches a CPU pipeline it covers (SyncPipelines), but no
+    // CPU is in its instruction hook, so memory.execute stays refused
+    ContextGuard guard(*this, HookContext::Service, n);
+    Raise(DMABreak[n]);
 }
 
 void Debugger::OnCall(ARM& cpu)

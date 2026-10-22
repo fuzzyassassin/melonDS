@@ -226,8 +226,15 @@ public:
     // ARM::GdbCheckC); the instruction of the first call never ran, so the step countdown does not advance.
     void OnInstr(ARM& cpu, u32 pc, bool redirected = false);
     void OnData(ARM& cpu, u32 addr, u8 size, u32 value, bool write);
-    // A DMA unit was written (called after the write, so a break sees the new memory).
+    // A DMA unit is about to be written. The memory log, the last writer and watch callbacks see memory before
+    // the write, as for a CPU store; a break the unit asks for is raised by OnDMAWritten, after the write, so
+    // the break sees the new memory and parks between this unit and the next.
     void OnDMA(u8 cpu, u8 channel, u32 src, u32 addr, u8 size, u32 value);
+    void OnDMAWritten(u8 cpu)
+    {
+        if (DMABreakValid[cpu])
+            RaiseDMABreak(cpu);
+    }
     void OnCall(ARM& cpu);
     void OnException(ARM& cpu, u32 ret);
     void OnFault(ARM& cpu, u32 pc, u32 addr);
@@ -262,6 +269,9 @@ private:
     std::array<u32, 2> StepRemaining {};
     std::array<bool, 2> PendingValid {};
     std::array<BreakEvent, 2> Pending {};
+    std::array<bool, 2> DMABreakValid {};   // a DMA watch hit to raise once its unit is written (OnDMAWritten)
+    std::array<BreakEvent, 2> DMABreak {};
+    void RaiseDMABreak(u8 n);
     bool InBreak = false;
     int InstrBreakCPU = -1;     // the CPU whose OnInstr is parked in Raise, else -1
 

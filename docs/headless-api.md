@@ -1778,7 +1778,12 @@ remove them with `event.unregisterbyid`/`unregisterbyname`), and need the debugg
 raises). The callback runs on the emulator thread at
 the access or instruction, with arguments `(addr, value, pc)` (for a DMA write `pc` is the DMA
 tag `0xFFFFFFF0 | channel << 1 | arm7`); returning `true` parks the console
-like a breakpoint (break kind exec/read/write with the hook's id), anything else continues. That
+like a breakpoint (break kind exec/read/write with the hook's id), anything else continues. A write
+hook runs **before** the write, for a CPU store and a DMA unit alike: `value` is what is being
+written and memory at `addr` still holds the old value (test `WriteHookSeesTheOldValue` in
+`test_pr_review.py`). The park a write asks for comes after the write (see the break table in
+[section 2](#breaks-what-happens-and-mds_take_break)). Before this, a DMA write hook ran after the
+unit was written and saw the new value. That
 makes any hook a conditional breakpoint. `event.onframeend` ids are negative. The Lua debugger
 tables share their data with the C API (`debugger.draintrace` drains the same ring as
 `mds_trace_take`).
