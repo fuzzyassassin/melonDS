@@ -1402,7 +1402,17 @@ void Debugger::OnInstr(ARM& cpu, u32 pc, bool redirected)
                 continue;
             BreakEvent hit {BreakKind::Exec, n, 0, id, pc, pc, 0};
             BreakCallback cb = it->Callback;
-            if ((!cb || cb(hit)) && !raise)
+            bool brk = !cb;
+            if (cb)
+            {
+                // a Step armed by the callback counts the instruction at pc first, as at the break: its hook
+                // (and the countdown above) have passed already
+                int outer = InstrBreakCPU;
+                InstrBreakCPU = n;
+                brk = cb(hit);
+                InstrBreakCPU = outer;
+            }
+            if (brk && !raise)
             {
                 ev = hit;
                 raise = true;
@@ -1473,9 +1483,14 @@ void Debugger::WatchHit(u8 n, u32 addr, u8 size, u32 value, bool write, u8 dma)
         u32 pc = dma == 0xFF ? CurPC[n] : (DMAWriterTag | (dma << 1) | n);
         BreakEvent hit {write ? BreakKind::Write : BreakKind::Read, n, size, id, pc, addr, value, dma};
         BreakCallback cb = it->Callback;
+        // a Step armed by a watch callback keeps the +1: the accessing instruction (or DMA unit) is not one of
+        // the count, as at the watch break it would make, even inside a breakpoint callback's memory.execute
+        int outer = InstrBreakCPU;
+        InstrBreakCPU = -1;
         MidInstr[n]++;
         bool brk = !cb || cb(hit);
         MidInstr[n]--;
+        InstrBreakCPU = outer;
         if (!brk)
             continue;
         if (dma != 0xFF)

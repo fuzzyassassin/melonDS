@@ -277,7 +277,7 @@ private:
     std::array<std::array<bool, 4>, 2> DMABroke {};  // the channel's current transfer has broken already
     void RaiseDMABreak(u8 n);
     bool InBreak = false;
-    int InstrBreakCPU = -1;     // the CPU whose OnInstr is parked in Raise, else -1
+    int InstrBreakCPU = -1;     // the CPU whose OnInstr is parked in Raise or runs breakpoint callbacks, else -1
 
     u8 TraceMask = 0;
     u32 TraceStart = 0, TraceEnd = 0;

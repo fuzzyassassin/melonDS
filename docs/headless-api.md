@@ -510,6 +510,13 @@ the instruction at the breakpoint is the first of the `n`. The same holds for th
 `step` message and Lua's `debugger.step`, which use the same countdown. (API level 1 executed `n - 1`
 from idle, and from any park that was not in that CPU's own instruction hook.)
 
+**From inside a hook** the count matches the break the hook stands for. In an exec hook
+(`event.onmemoryexecute`, a breakpoint callback) `debugger.step(n)` counts the hooked instruction as
+the first of the `n`, as at a breakpoint break (it executed `n + 1` before). In a write or read hook
+the accessing instruction is already running and is not counted: the step parks where `n` steps
+from that watchpoint's break would (that break parks at the next instruction); in a DMA write hook,
+as from a DMA break. Tests `StepFromAHook` in `test_pr_review.py`.
+
 `count = 0` disarms. The other CPU keeps running while one is stepped; the whole console parks. If
 the CPU is halted (waiting for an interrupt) the step completes when it wakes. Give the run a frame
 budget large enough to reach the step (the socket server uses a cap); the frame count advances only
