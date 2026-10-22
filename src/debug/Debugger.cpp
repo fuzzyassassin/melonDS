@@ -1491,7 +1491,12 @@ void Debugger::WatchHit(u8 n, u32 addr, u8 size, u32 value, bool write, u8 dma)
         }
     }
     if (raiseDMA)
+    {
+        // the service context: a write while parked here refetches a CPU pipeline it covers (SyncPipelines),
+        // but no CPU is in its instruction hook, so memory.execute stays refused
+        ContextGuard guard(*this, HookContext::Service, n);
         Raise(dmaEvent);
+    }
 }
 
 void Debugger::OnCall(ARM& cpu)

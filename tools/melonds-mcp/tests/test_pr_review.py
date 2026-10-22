@@ -55,6 +55,19 @@ class DmaBreakPipelineRefetch(ConsoleTest):
         self.run_frames(1)
         self.assertEqual(self.c.regs()["r2"], 2, "the stale prefetched mov r2, #1 ran instead of the patch")
 
+    def test_memory_execute_is_refused_at_a_dma_break(self):
+        # no CPU is inside its instruction hook at a DMA break
+        self.c.write(self.SRC, bytes(range(1, 17)))
+        self.c.write(self.DST, bytes(16))
+        self.load_program(dma_program(self.SRC, self.DST))
+        self.c.add_watchpoint(self.DST, 16, write=True)
+        _, states = self.c.run(3)
+        self.assertEqual(states, [native.PARKED])
+        self.assertEqual(self.c.take_break().dma, 0)
+        with self.assertRaises(native.MelonError) as cm:
+            self.c.lua_exec("memory.execute(0xE1A00000)")
+        self.assertIn("only inside an exec hook", str(cm.exception))
+
 
 class WriteHookSeesTheOldValue(ConsoleTest):
     """Finding 2: a write hook sees memory before the write, whether a CPU store or a DMA unit makes it."""
