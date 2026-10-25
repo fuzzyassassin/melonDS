@@ -11,7 +11,7 @@ reading the code but no test covers them. Claims marked *(verified)* were checke
 one-console experiment against this branch's DLL. Bugs and surprises are collected at the end, in
 [Known issues and surprises](#11-known-issues-and-surprises).
 
-This revision describes **API level 9**: the `fix/api-quirks` changes (level 2), Action Replay
+This revision describes **API level 10**: the `fix/api-quirks` changes (level 2), Action Replay
 cheat codes from the `feature/cheats` branch (level 3), the debugger work merged from
 ZevyaDev's `debug` branch on `merge/upstream-debug` (level 4: thread stacks, the new call tracker,
 PC changes at a break, pipeline refetch, Lua `memory.execute` and `wifi`), its next merge on
@@ -23,7 +23,9 @@ packets that cannot block, errors for unknown ids, Lua hooks in the point list, 
 which parks the console; [section 5b](#5b-probes-the-memory-log-breakpoint-actions-and-overlay-tags)),
 render control from `feature/render-control` (level 8: skipping 2D / 3D drawing, threaded 3D), and
 `fix/savestate-irq` (level 9: a state load recomputes the CPU state it does not carry, so nothing of
-the run before the load survives it).
+the run before the load survives it), and level 10, which names the DMA break and stepping fixes of
+2026-10-22 (one break per DMA transfer, hooks that see the old value, patched code that runs, `step(n)` from
+a breakpoint callback); they changed behaviour at level 9 without a bump.
 See [Version and features](#version-and-features) for what changed at each level.
 
 Contents
@@ -142,7 +144,7 @@ debugger (debug = 0)` (see [section 2](#creating-and-destroying)).
 
 | Function | Does |
 | --- | --- |
-| `int mds_version(void)` | The API level: 7 for this branch (`MDS_API_VERSION` in `melonds_api.h`), 1 for every library before the level scheme. See [Version and features](#version-and-features). |
+| `int mds_version(void)` | The API level: 10 for this branch (`MDS_API_VERSION` in `melonds_api.h`), 1 for every library before the level scheme. See [Version and features](#version-and-features). |
 | `int mds_has(const char* name)` | 1 if the library has the named feature or exports the named function, else 0 (also for NULL). Level 2 and later; on a level-1 library look the symbol up. |
 | `void mds_set_local_dir(const char* dir)` | Directory for the files the melonDS core opens *by relative name* through `Platform::OpenLocalFile` (DSi NAND, SD/FAT image index, OpenGL shader cache). NULL means `.`. It does **not** affect BIOS, firmware, ROM, save or state paths: those are opened exactly as given, relative to the process's working directory. Process-wide, not synchronised: set it before creating consoles. |
 | `void mds_set_log_level(int level)` | Core log threshold: 0 Debug, 1 Info, 2 Warn (default), 3 Error. Messages at or above it go to stderr. Process-wide. |
@@ -167,6 +169,7 @@ does this: `native.api_version()`, `native.has(name)` (see [section 9](#9-python
 | 7 | `feature/probes` | `melonds_probes.h`: `mds_probe_*`, `mds_memlog_*`, `mds_action_*`, `mds_overlay_tags`, `mds_overlay_at`, `mds_callcounts_take_ov`, `mds_coverage_take_ov` (the features of level 7 below); no existing call or output changed |
 | 8 | `feature/render-control` | `mds_set_render`, `mds_set_threaded_3d`, `mds_render_stats`, `MDS_RENDER_SKIP_2D`, `MDS_RENDER_SKIP_3D`, `MDS_RENDER_STATS` (features of level 8 below); the soft renderer's threaded mode no longer redraws the current 3D frame when it is switched on. Built at level 7 in parallel with `feature/probes`, renumbered 8 at the merge: ask `mds_has` for the features, not the level |
 | 9 | `fix/savestate-irq` | no new functions; savestate loads recompute derived CPU state, GX FIFO padding is zeroed (the features of level 9 below). Built at level 7 in parallel, renumbered 9 at the merge |
+| 10 | `feature/api-level-10` | no new functions; feature names for the behaviour changes made at level 9 by the review fixes of 2026-10-22 and upstream's matching follow-ups: one break per DMA transfer, DMA hooks see the old value, code patched at a DMA break runs, `step(n)` from a breakpoint callback (the features of level 10 below). Also at level 9 without a feature name: upstream's GDB stub ignores a `^C` that arrives while the target is already stopped and parses a packet buffered behind a `^C` |
 
 Features of level 2 (`mds_has` also answers 1 for every exported function name, `"mds_serve_host"`,
 `"mds_read"`, ...):
@@ -253,6 +256,15 @@ Features of level 9 (core changes, so they apply to every frontend built from th
 | --- | --- |
 | `savestate_derived` | a state load recomputes the CPUs' pending-interrupt lines and the ARM9 code-fetch timing from the loaded state, instead of keeping their pre-load values: a console that loads a state runs exactly as a fresh console that loads it, and as the console that saved it ran on ([section 6](#6-savestates)) |
 | `gx_fifo_zeroed` | GX command FIFO entries are written with their 3 padding bytes zeroed, so states (which hold the FIFO arrays raw) no longer contain stray stack bytes ([section 6](#6-savestates)) |
+
+Features of level 10 (behaviours that came in at level 9; libraries from before 2026-10-22 lack them):
+
+| feature | meaning |
+| --- | --- |
+| `dma_break_once` | a DMA watchpoint parks once per transfer, not once per unit; the channel's next transfer can break again ([Breaks](#breaks-what-happens-and-mds_take_break)) |
+| `dma_hook_old_value` | DMA write hooks run before the unit is written, so they see the old value; the park comes after the write ([Breaks](#breaks-what-happens-and-mds_take_break)) |
+| `dma_break_patch` | code patched at a DMA break runs: the break is served in the service context and the CPUs' pipelines are refetched ([Breaks](#breaks-what-happens-and-mds_take_break)) |
+| `step_from_hook` | `step(n)` from a breakpoint callback (an exec hook) counts the hooked instruction as the first of the `n`, as at a breakpoint break; it executed `n + 1` before ([Stepping](#stepping-mds_step)) |
 
 ### Wireless between consoles, and one console per process
 

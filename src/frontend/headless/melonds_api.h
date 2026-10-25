@@ -104,9 +104,9 @@ typedef struct
 // Reference: docs/headless-api.md, section 1 (library-wide settings, errors, version and features).
 // API level: 1 up to the IPC merge, 2 from fix/api-quirks, 3 from feature/cheats, 4 from merge/upstream-debug,
 // 5 from merge/upstream-debug-2, 6 from fix/api-quirks-2, 7 from feature/probes, 8 from feature/render-control,
-// 9 from fix/savestate-irq (MDS_API_VERSION). It goes up whenever functions are added or behaviour changes; mds_has
-// names the features.
-#define MDS_API_VERSION 9
+// 9 from fix/savestate-irq, 10 from feature/api-level-10 (MDS_API_VERSION). It goes up whenever functions are added
+// or behaviour changes; mds_has names the features.
+#define MDS_API_VERSION 10
 MDS_API int mds_version(void);
 // 1 if the library has the named feature or exported function ("serve_host", "mds_serve_host", ...; the list
 // is in docs/headless-api.md, section 1), else 0. Absent from libraries before API level 2: look the symbol up.

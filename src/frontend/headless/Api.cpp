@@ -263,6 +263,11 @@ int mds_has(const char* name)
         // API level 9 (fix/savestate-irq)
         "savestate_derived",    // a load recomputes the CPUs' IRQ lines and the ARM9 code timing: nothing of the run before it survives
         "gx_fifo_zeroed",       // GX FIFO entries are written with zeroed padding, so states hold no stray bytes
+        // API level 10 (feature/api-level-10: names for the review fixes of 2026-10-22, made at level 9)
+        "dma_break_once",       // a DMA watchpoint parks once per transfer, not once per unit
+        "dma_hook_old_value",   // DMA write hooks run before the unit is written: they see the old value
+        "dma_break_patch",      // code patched at a DMA break runs (the break runs in the service context, pipelines refetched)
+        "step_from_hook",       // step(n) from a breakpoint callback counts the hooked instruction: n instructions, not n + 1
     };
     static const char* const Functions[] = {
         "mds_has", "mds_serve_host", "mds_gdb_host", "mds_lastwriter_query",

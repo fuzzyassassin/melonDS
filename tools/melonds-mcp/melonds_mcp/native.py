@@ -370,7 +370,7 @@ def _mask(cpu):
 def api_version():
     """The library's API level (mds_version): 1 up to the IPC merge, 2 from fix/api-quirks, 3 from feature/cheats,
     4 from merge/upstream-debug, 5 from merge/upstream-debug-2, 6 from fix/api-quirks-2, 7 from feature/probes,
-    8 from feature/render-control, 9 from fix/savestate-irq."""
+    8 from feature/render-control, 9 from fix/savestate-irq, 10 from feature/api-level-10."""
     return lib().mds_version()
 
 
