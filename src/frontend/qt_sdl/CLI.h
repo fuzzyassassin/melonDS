@@ -34,6 +34,13 @@ struct CommandLineOptions
     std::optional<QString> gbaRomArchivePath;
     bool fullscreen;
     bool boot;
+    // debugging set up at startup (debugger/StartupOptions.h)
+    QString symbolsPath;
+    QString labelsPath;
+    QString statePath;
+    QStringList breakpoints;
+    bool pause = false;
+    bool debugger = false;
 };
 
 extern CommandLineOptions* ManageArgs(QApplication& melon);

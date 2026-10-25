@@ -49,11 +49,24 @@ CommandLineOptions* ManageArgs(QApplication& melon)
     parser.addOption(QCommandLineOption({"A", "archive-file-gba"}, "Specify file to load inside an archive given (GBA)", "rom"));
 #endif
 
+    parser.addOption(QCommandLineOption("symbols", "Load these symbols for the game: a dsd config.yaml (or its folder) or an 'address name [size]' file; remembered per game like the debugger's Symbols...", "path"));
+    parser.addOption(QCommandLineOption("labels", "Layer this 'address name [module]' labels file over the symbols; remembered per game like the debugger's Labels...", "file"));
+    parser.addOption(QCommandLineOption("state", "Load this savestate once the ROM has booted", "file"));
+    parser.addOption(QCommandLineOption("break", "Add an ARM9 execute breakpoint: an address, a symbol or label, or symbol+0x10 (repeatable; read after --symbols and --labels)", "address"));
+    parser.addOption(QCommandLineOption("pause", "Leave the console paused after --state and --break"));
+    parser.addOption(QCommandLineOption("debugger", "Open the debugger window at startup"));
+
     parser.process(melon);
 
     CommandLineOptions* options = new CommandLineOptions;
 
     options->fullscreen = parser.isSet("fullscreen");
+    options->symbolsPath = parser.value("symbols");
+    options->labelsPath = parser.value("labels");
+    options->statePath = parser.value("state");
+    options->breakpoints = parser.values("break");
+    options->pause = parser.isSet("pause");
+    options->debugger = parser.isSet("debugger");
 
     QStringList posargs = parser.positionalArguments();
     switch (posargs.size())

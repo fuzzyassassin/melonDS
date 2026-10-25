@@ -79,6 +79,7 @@ set(SOURCES_QT_SDL
     debugger/SourceView.cpp
     debugger/DebugTool.cpp
     debugger/DebugTools.cpp
+    debugger/StartupOptions.cpp
     debugger/DebuggerWindow.cpp
     debugger/DisasmView.cpp
     debugger/TraceWindow.cpp

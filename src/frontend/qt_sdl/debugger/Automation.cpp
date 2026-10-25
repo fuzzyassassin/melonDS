@@ -509,6 +509,24 @@ QString Automation::run(const QStringList& args)
         bridge->run([&](NDS& nds) { id = nds.Debugger.AddWatchpoint(1, addr, size, flags); });
         return QString("ok %1").arg(id);
     }
+    if (c == "points")
+    {
+        // one line per breakpoint: id address cpumask enabled
+        QStringList lines;
+        bool ok = bridge->run([&](NDS& nds) {
+            for (const Breakpoint& b : nds.Debugger.GetBreakpoints())
+                if (!b.Callback)
+                    lines << QString("%1 %2 %3 %4").arg(b.ID).arg(Hex(b.Addr)).arg(b.CPUMask).arg(b.Enabled);
+        });
+        if (!ok)
+            return "error: timeout";
+        return lines.isEmpty() ? "none" : lines.join("\n");
+    }
+    if (c == "symname" && args.size() > 1)
+    {
+        const DebugSymbols::Symbol* sym = bridge->symbols().lookup(Num(args[1]));
+        return sym ? SymStr(bridge->symbols().name(*sym)) : "none";
+    }
     if (c == "clearpoints")
     {
         bridge->run([](NDS& nds) { nds.Debugger.ClearAll(); });

@@ -45,6 +45,18 @@ info from an ELF... loads any other one. Rows are matched to modules through `de
 overlays that share addresses resolve to the loaded one. When that ELF is rebuilt, the symbols, line
 info and source files reload a second after the linker finishes writing it.
 
+## Starting from the command line
+
+    melonDS --symbols config.yaml --labels game.labels --state scene.mln --break 0x02087d78 --break Foo_Run --pause game.nds
+
+Once the ROM has booted, melonDS pauses, loads the symbols and labels (as Symbols... and Labels... do, so they are
+remembered for the game), loads the savestate, adds an ARM9 execute breakpoint for each `--break` (an address, a
+symbol or label, or `symbol+0x10`; read after the symbols and labels), then runs again unless `--pause` is given.
+`--debugger` opens the debugger window; a breakpoint hit opens it anyway. A missing file or an unknown name is logged
+and shown on screen, and the rest still applies. Breakpoints are by address: on an overlay function they mean that
+function while its overlay is the one loaded (the savestate's). They need JIT off. Test: `tests/test_qt_startup.py` in
+`tools/melonds-mcp` (needs a `-DMELONDS_AUTOMATION=ON` build named by `MELONDS_QT_AUTOMATION_EXE`).
+
 ## Debugger window
 
 | key | does |
