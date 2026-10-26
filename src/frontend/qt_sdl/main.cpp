@@ -60,7 +60,10 @@
 #include "MPInterface.h"
 #include "Net.h"
 
+#include <QTimer>
+
 #include "CLI.h"
+#include "debugger/StartupOptions.h"
 
 #include "Net_PCap.h"
 #include "Net_Slirp.h"
@@ -424,7 +427,20 @@ int main(int argc, char** argv)
 
         if (memberSyntaxUsed) printf("Warning: use the a.zip|b.nds format at your own risk!\n");
 
-        win->preloadROMs(dsfile, gbafile, options->boot);
+        bool booted = win->preloadROMs(dsfile, gbafile, options->boot) && !dsfile.isEmpty() && options->boot;
+
+        DebugTools::StartupOptions startup;
+        startup.Symbols = options->symbolsPath;
+        startup.Labels = options->labelsPath;
+        startup.State = options->statePath;
+        startup.Breaks = options->breakpoints;
+        startup.Pause = options->pause;
+        startup.Debugger = options->debugger;
+        if (startup.any())
+        {
+            EmuInstance* inst = emuInstances[0];
+            QTimer::singleShot(0, win, [inst, startup, booted] { DebugTools::applyStartup(inst, startup, booted); });
+        }
 
         if (options->fullscreen)
             win->toggleFullscreen();
